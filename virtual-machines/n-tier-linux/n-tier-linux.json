@@ -1,0 +1,461 @@
+{
+    "$schema": "https://raw.githubusercontent.com/mspnp/template-building-blocks/master/schemas/buildingBlocks.json",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "buildingBlocks": {
+            "value": [
+                {
+                    "type": "VirtualNetwork",
+                    "settings": [
+                        {
+                            "name": "ra-ntier-vnet",
+                            "addressPrefixes": [
+                                "10.0.0.0/16"
+                            ],
+                            "subnets": [
+                                {
+                                    "name": "web",
+                                    "addressPrefix": "10.0.1.0/24"
+                                },
+                                {
+                                    "name": "biz",
+                                    "addressPrefix": "10.0.2.0/24"
+                                },
+                                {
+                                    "name": "data",
+                                    "addressPrefix": "10.0.3.0/24"
+                                },
+                                {
+                                    "name": "mgmt",
+                                    "addressPrefix": "10.0.0.128/25"
+                                },
+                                {
+                                    "name": "appgateway",
+                                    "addressPrefix": "10.0.4.0/25"
+                                }
+                            ],
+                            "dnsServers": []
+                        }
+                    ]
+                },
+                {
+                    "type": "VirtualMachine",
+                    "settings": {
+                        "vmCount": 3,
+                        "namePrefix": "web",
+                        "computerNamePrefix": "web",
+                        "adminUsername": "testadminuser",
+                        "adminPassword": "test$!Passw0rd111",
+                        "virtualNetwork": {
+                            "name": "ra-ntier-vnet"
+                        },
+                        "nics": [
+                            {
+                                "isPrimary": true,
+                                "isPublic": false,
+                                "privateIPAllocationMethod": "Static",
+                                "startingIPAddress": "10.0.1.5",
+                                "subnetName": "web"
+                            }
+                        ],
+                        "osType": "linux",
+                        "extensions": [
+                            {
+                                "name": "apache-config-ext",
+                                "publisher": "Microsoft.Azure.Extensions",
+                                "type": "CustomScript",
+                                "typeHandlerVersion": "2.0",
+                                "autoUpgradeMinorVersion": true,
+                                "settings": {
+                                    "fileUris": [
+                                        "https://raw.githubusercontent.com/mspnp/reference-architectures/master/scripts/linux/install-apache.sh"
+                                    ],
+                                    "commandToExecute": "sh install-apache.sh"
+                                },
+                                "protectedSettings": {}
+                            }
+                        ],
+                        "applicationGatewaySettings": {
+                            "name": "webAppGateway",
+                            "sku": {
+                                "size": "Medium",
+                                "capacity": 2,
+                                "tier": "WAF"
+                            },
+                            "gatewayIPConfigurations": [
+                                {
+                                    "name": "webIPConfig",
+                                    "subnetName": "appgateway"
+                                }
+                            ],
+                            "frontendIPConfigurations": [
+                                {
+                                    "name": "webFrontEndIPConfig1",
+                                    "applicationGatewayType": "Public"
+                                }
+                            ],
+                            "frontendPorts": [
+                                {
+                                    "name": "webFrontEndPort1",
+                                    "port": 80
+                                }
+                            ],
+                            "backendAddressPools": [
+                                {
+                                    "name": "webBackendAddressPool",
+                                    "backendAddresses": [
+                                        {
+                                            "ipAddress": "10.0.1.5"
+                                        },
+                                        {
+                                            "ipAddress": "10.0.1.6"
+                                        },
+                                        {
+                                            "ipAddress": "10.0.1.7"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "backendHttpSettingsCollection": [
+                                {
+                                    "name": "webBackendHttpSetting1",
+                                    "port": 80,
+                                    "protocol": "Http",
+                                    "cookieBasedAffinity": "Disabled"
+                                }
+                            ],
+                            "httpListeners": [
+                                {
+                                    "name": "webHttpListener1",
+                                    "frontendIPConfigurationName": "webFrontEndIPConfig1",
+                                    "frontendPortName": "webFrontEndPort1",
+                                    "protocol": "Http"
+                                }
+                            ],
+                            "requestRoutingRules": [
+                                {
+                                    "name": "webRule1",
+                                    "ruleType": "Basic",
+                                    "httpListenerName": "webHttpListener1",
+                                    "backendAddressPoolName": "webBackendAddressPool",
+                                    "backendHttpSettingsName": "webBackendHttpSetting1"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "type": "VirtualMachine",
+                    "settings": {
+                        "vmCount": 3,
+                        "namePrefix": "biz",
+                        "size": "Standard_DS1_v2",
+                        "computerNamePrefix": "biz",
+                        "adminUsername": "testadminuser",
+                        "adminPassword": "test$!Passw0rd111",
+                        "virtualNetwork": {
+                            "name": "ra-ntier-vnet"
+                        },
+                        "nics": [
+                            {
+                                "isPrimary": true,
+                                "isPublic": false,
+                                "privateIPAllocationMethod": "Dynamic",
+                                "subnetName": "biz",
+                                "backendPoolNames": [
+                                    "lb-bep1"
+                                ]
+                            }
+                        ],
+                        "osType": "linux",
+                        "loadBalancerSettings": {
+                            "frontendIPConfigurations": [
+                                {
+                                    "name": "ra-ntier-biz-config1",
+                                    "loadBalancerType": "Internal",
+                                    "internalLoadBalancerSettings": {
+                                        "privateIPAddress": "10.0.2.250",
+                                        "subnetName": "biz"
+                                    }
+                                }
+                            ],
+                            "loadBalancingRules": [
+                                {
+                                    "name": "lbr1",
+                                    "frontendPort": 80,
+                                    "backendPort": 80,
+                                    "protocol": "Tcp",
+                                    "backendPoolName": "lb-bep1",
+                                    "frontendIPConfigurationName": "ra-ntier-biz-config1",
+                                    "probeName": "lbp1",
+                                    "enableFloatingIP": false
+                                }
+                            ],
+                            "probes": [
+                                {
+                                    "name": "lbp1",
+                                    "port": 80,
+                                    "protocol": "Http",
+                                    "requestPath": "/"
+                                }
+                            ],
+                            "backendPools": [
+                                {
+                                    "name": "lb-bep1",
+                                    "nicIndex": 0
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "type": "VirtualMachine",
+                    "settings": {
+                        "vmCount": 6,
+                        "namePrefix": "data",
+                        "size": "Standard_DS1_v2",
+                        "computerNamePrefix": "data",
+                        "adminUsername": "testadminuser",
+                        "adminPassword": "test$!Passw0rd111",
+                        "virtualNetwork": {
+                            "name": "ra-ntier-vnet"
+                        },
+                        "nics": [
+                            {
+                                "isPublic": true,
+                                "isPrimary": true,
+                                "subnetName": "data",
+                                "privateIPAllocationMethod": "Dynamic",
+                                "domainNameLabelPrefix": "rantierdatanode",
+                                "dnsServers": [ ]
+                            }
+                        ],
+                        "osType": "linux",
+                        "extensions": [
+                            {
+                                "name": "install-cassandra",
+                                "publisher": "Microsoft.Azure.Extensions",
+                                "type": "CustomScript",
+                                "typeHandlerVersion": "2.0",
+                                "autoUpgradeMinorVersion": true,
+                                "settings": {
+                                    "fileUris": [
+                                        "https://raw.githubusercontent.com/mspnp/reference-architectures/master/scripts/linux/install-cassandra.sh"
+                                    ],
+                                    "commandToExecute": "[concat('bash install-cassandra.sh rantierdatanode11 rantierops1 ra-ntier-dc-',resourceGroup().location,' ',resourceGroup().location)]"
+                                },
+                                "protectedSettings": {}
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": "VirtualMachine",
+                    "settings": {
+                        "vmCount": 1,
+                        "namePrefix": "ops",
+                        "computerNamePrefix": "ops",
+                        "size": "Standard_DS1_v2",
+                        "adminUsername": "testadminuser",
+                        "adminPassword": "test$!Passw0rd111",
+                        "virtualNetwork": {
+                            "name": "ra-ntier-vnet"
+                        },
+                        "nics": [
+                            {
+                                "isPublic": true,
+                                "isPrimary": true,
+                                "privateIPAllocationMethod": "Dynamic",
+                                "subnetName": "mgmt",
+                                "domainNameLabelPrefix": "rantierops",
+                                "dnsServers": [ ]
+                            }
+                        ],
+                        "osType": "linux",
+                        "extensions": [
+                            {
+                                "name": "install-opscenter",
+                                "publisher": "Microsoft.Azure.Extensions",
+                                "type": "CustomScript",
+                                "typeHandlerVersion": "2.0",
+                                "autoUpgradeMinorVersion": true,
+                                "settings": {
+                                    "fileUris": [
+                                        "https://raw.githubusercontent.com/mspnp/reference-architectures/master/scripts/linux/install-opscenter.sh"
+                                    ],
+                                    "commandToExecute": "[concat('sudo bash install-opscenter.sh rantierdatanode11 ', resourceGroup().location)]"
+                                },
+                                "protectedSettings": {}
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": "VirtualMachine",
+                    "settings": {
+                        "vmCount": 1,
+                        "namePrefix": "jb",
+                        "computerNamePrefix": "jb",
+                        "size": "Standard_DS1_v2",
+                        "adminUsername": "testadminuser",
+                        "adminPassword": "test$!Passw0rd111",
+                        "virtualNetwork": {
+                            "name": "ra-ntier-vnet"
+                        },
+                        "nics": [
+                            {
+                                "isPublic": true,
+                                "isPrimary": true,
+                                "privateIPAllocationMethod": "Dynamic",
+                                "publicIPAllocationMethod": "Dynamic",
+                                "subnetName": "mgmt",
+                                "name": "jb-vm1-nic1"
+                            }
+                        ],
+                        "osType": "linux"
+                    }
+                },
+                {
+                    "type": "NetworkSecurityGroup",
+                    "settings": [
+                        {
+                            "name": "ra-ntier-appgateway-nsg",
+                            "virtualNetworks": [
+                                {
+                                    "name": "ra-ntier-vnet",
+                                    "subnets": [
+                                        "appgateway"
+                                    ]
+                                }
+                            ],
+                            "securityRules": [
+                                {
+                                    "name": "HTTP",
+                                    "priority": 100
+                                }
+                            ]
+                        },
+                        {
+                            "name": "ra-ntier-web-nsg",
+                            "virtualNetworks": [
+                                {
+                                    "name": "ra-ntier-vnet",
+                                    "subnets": [
+                                        "web"
+                                    ]
+                                }
+                            ],
+                            "securityRules": [
+                                {
+                                    "name": "HTTP",
+                                    "sourceAddressPrefix": "10.0.4.0/25",
+                                    "priority": 100
+                                },
+                                {
+                                    "name": "SSH",
+                                    "sourceAddressPrefix": "10.0.0.128/25",
+                                    "priority": 110
+                                }
+                            ]
+                        },
+                        {
+                            "name": "ra-ntier-biz-nsg",
+                            "virtualNetworks": [
+                                {
+                                    "name": "ra-ntier-vnet",
+                                    "subnets": [
+                                        "biz"
+                                    ]
+                                }
+                            ],
+                            "securityRules": [
+                                {
+                                    "name": "HTTP",
+                                    "sourceAddressPrefix": "10.0.1.0/24",
+                                    "priority": 100
+                                }
+                            ]
+                        },
+                        {
+                            "name": "ra-ntier-data-nsg",
+                            "virtualNetworks": [
+                                {
+                                    "name": "ra-ntier-vnet",
+                                    "subnets": [
+                                        "data"
+                                    ]
+                                }
+                            ],
+                            "securityRules": [
+                                {
+                                    "name": "SSH",
+                                    "priority": 100,
+                                    "sourceAddressPrefix": "10.0.0.128/25"
+                                },
+                                {
+                                    "name": "allow-ops-center-http",
+                                    "protocol": "*",
+                                    "sourcePortRange": "*",
+                                    "destinationPortRange": "8888-65535",
+                                    "sourceAddressPrefix": "*",
+                                    "destinationAddressPrefix": "*",
+                                    "access": "Allow",
+                                    "priority": 110,
+                                    "direction": "Inbound"
+                                },
+                                {
+                                    "name": "Cassandra",
+                                    "priority": 120
+                                },
+                                {
+                                    "name": "Cassandra-JMX",
+                                    "priority": 130
+                                }
+                            ]
+                        },
+                        {
+                            "name": "ra-ntier-mgmt-ops-nsg",
+                            "networkInterfaces": [
+                                {
+                                    "name": "ops-vm1-nic1"
+                                }
+                            ],
+                            "securityRules": [
+                                {
+                                    "name": "SSH",
+                                    "priority": 100,
+                                    "sourceAddressPrefix": "10.0.0.128/25"
+                                },
+                                {
+                                    "name": "allow-http",
+                                    "protocol": "*",
+                                    "sourcePortRange": "*",
+                                    "destinationPortRange": 8888,
+                                    "sourceAddressPrefix": "*",
+                                    "destinationAddressPrefix": "*",
+                                    "access": "Allow",
+                                    "priority": 110,
+                                    "direction": "Inbound"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "ra-ntier-mgmt-jb-nsg",
+                            "networkInterfaces": [
+                                {
+                                    "name": "jb-vm1-nic1"
+                                }
+                            ],
+                            "securityRules": [
+                                {
+                                    "name": "SSH",
+                                    "priority": 100
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

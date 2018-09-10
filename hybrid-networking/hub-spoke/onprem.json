@@ -1,0 +1,67 @@
+{
+    "$schema": "https://raw.githubusercontent.com/mspnp/template-building-blocks/master/schemas/buildingBlocks.json",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "buildingBlocks": {
+            "value": [
+                {
+                    "type": "VirtualNetwork",
+                    "resourceGroupName": "onprem-vnet-rg",
+                    "settings": [
+                        {
+                            "name": "onprem-vnet",
+                            "addressPrefixes": [
+                                "192.168.0.0/16"
+                            ],
+                            "subnets": [
+                                {
+                                    "name": "mgmt",
+                                    "addressPrefix": "192.168.1.128/25"
+                                },
+                                {
+                                    "name": "GatewaySubnet",
+                                    "addressPrefix": "192.168.255.224/27"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "VirtualMachine",
+                    "resourceGroupName": "onprem-jb-rg",
+                    "settings": {
+                        "vmCount": 1,
+                        "namePrefix": "jb",
+                        "size": "Standard_DS1_v2",
+                        "adminUsername": "",
+                        "adminPassword": "",
+                        "osType": "windows",
+                        "virtualNetwork": {
+                            "resourceGroupName": "onprem-vnet-rg",
+                            "name": "onprem-vnet"
+                        },
+                        "nics": [
+                            {
+                                "subnetName": "mgmt"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": "VirtualNetworkGateway",
+                    "settings": {
+                        "name": "onprem-vpn-gateway1",
+                        "gatewayType": "Vpn",
+                        "vpnType": "RouteBased",
+                        "sku": "VpnGw1",
+                        "isPublic": true,
+                        "virtualNetwork": {
+                            "resourceGroupName": "onprem-vnet-rg",
+                            "name": "onprem-vnet"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

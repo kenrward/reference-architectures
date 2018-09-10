@@ -1,0 +1,22 @@
+#!/bin/bash
+
+export rgName=""
+export stName=""
+export location=""
+
+az resource create \
+    --name $rgName \
+    --location $location
+
+az storage account create \
+    --name $stName \
+    --resource-group $rgName \
+    --access-tier "Hot" \
+    --https-only true \
+    --kind "StorageV2" \
+    --sku "Standard_LRS" \
+    --location $location
+
+az storage account show-connection-string \
+    -g $rgName \
+    -n $stName

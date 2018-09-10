@@ -1,0 +1,696 @@
+{
+    "$schema": "https://raw.githubusercontent.com/mspnp/template-building-blocks/master/schemas/buildingBlocks.json",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "buildingBlocks": {
+            "value": [
+                {
+                    "type": "VirtualNetwork",
+                    "settings": [
+                        {
+                            "name": "ra-vnet",
+                            "addressPrefixes": [
+                              "10.0.0.0/16"
+                            ],
+                            "subnets": [
+                              {
+                                "name": "GatewaySubnet",
+                                "addressPrefix": "10.0.255.224/27"
+                              },
+                              {
+                                "name": "mgmt",
+                                "addressPrefix": "10.0.0.128/25"
+                              },
+                              {
+                                "name": "dmz-in",
+                                "addressPrefix": "10.0.0.0/27"
+                              },
+                              {
+                                "name": "dmz-out",
+                                "addressPrefix": "10.0.0.32/27"
+                              },
+                              {
+                                "name": "web",
+                                "addressPrefix": "10.0.1.0/24"
+                              },
+                              {
+                                "name": "biz",
+                                "addressPrefix": "10.0.2.0/24"
+                              },
+                              {
+                                "name": "data",
+                                "addressPrefix": "10.0.3.0/24"
+                              }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "VirtualMachine",
+                    "settings": {
+                        "vmCount": 1,
+                        "namePrefix": "ra-dmz-jb",
+                        "computerNamePrefix": "cn",
+                        "size": "Standard_DS1_v2",
+                        "osType": "windows",
+                        "adminUsername": "testuser",
+                        "adminPassword": "AweS0me@PW",
+                        "nics": [
+                          {
+                            "isPublic": false,
+                            "subnetName": "mgmt",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "isPrimary": true,
+                            "enableIPForwarding": false
+                          }
+                        ],
+                        "imageReference": {
+                          "publisher": "MicrosoftWindowsServer",
+                          "offer": "WindowsServer",
+                          "sku": "2012-R2-Datacenter",
+                          "version": "latest"
+                        },
+                        "dataDisks": {
+                          "count": 1
+                        },
+                        "extensions": [
+                          {
+                            "name": "IaaSAntimalware",
+                            "publisher": "Microsoft.Azure.Security",
+                            "type": "IaaSAntimalware",
+                            "typeHandlerVersion": "1.3",
+                            "autoUpgradeMinorVersion": true,
+                            "settings": {
+                              "AntimalwareEnabled": true,
+                              "RealtimeProtectionEnabled": "false",
+                              "ScheduledScanSettings": {
+                                "isEnabled": "false",
+                                "day": "7",
+                                "time": "120",
+                                "scanType": "Quick"
+                              },
+                              "Exclusions": {
+                                "Extensions": ".gif",
+                                "Paths": "c:\\test",
+                                "Processes": "test.exe"
+                              }
+                            },
+                            "protectedSettings": { }
+                          }
+                        ],
+                        "virtualNetwork": {
+                            "name": "ra-vnet"
+                        }
+                    }
+                },
+                {
+                    "type": "VirtualMachine",
+                    "settings":{
+                        "vmCount": 2,
+                        "namePrefix": "ra-dmz-web",
+                        "computerNamePrefix": "web",
+                        "size": "Standard_DS1_v2",
+                        "osType": "linux",
+                        "adminUsername": "testuser",
+                        "adminPassword": "AweS0me@PW",
+                        "virtualNetwork": {
+                            "name": "ra-vnet"
+                        },
+                        "nics": [
+                          {
+                            "isPublic": false,
+                            "subnetName": "web",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "isPrimary": true,
+                            "enableIPForwarding": false,
+                            "backendPoolNames": [
+                              "bep1"
+                            ]
+                          }
+                        ],
+                        "imageReference": {
+                          "publisher": "Canonical",
+                          "offer": "UbuntuServer",
+                          "sku": "14.04.5-LTS",
+                          "version": "latest"
+                        },
+                        "dataDisks": {
+                          "count": 1
+                        },
+                        "extensions": [
+                          {
+                            "name": "apache-config-ext",
+                            "publisher": "Microsoft.Azure.Extensions",
+                            "type": "CustomScript",
+                            "typeHandlerVersion": "2.0",
+                            "autoUpgradeMinorVersion": true,
+                            "settings": {
+                              "fileUris": [ "https://raw.githubusercontent.com/mspnp/reference-architectures/master/dmz/secure-vnet-hybrid/extensions/linux/install-apache.sh" ]
+                            },
+                            "protectedSettings": { 
+                              "commandToExecute": "sudo sh install-apache.sh"
+                            }
+                          }
+                        ],
+                        "loadBalancerSettings": {
+                            "frontendIPConfigurations": [
+                              {
+                                "name": "fe-config1",
+                                "loadBalancerType": "Internal",
+                                "internalLoadBalancerSettings": {
+                                  "privateIPAddress": "10.0.1.100",
+                                  "subnetName": "web"
+                                }
+                              }
+                            ],
+                            "loadBalancingRules": [
+                              {
+                                "name": "lbr1",
+                                "frontendPort": 80,
+                                "backendPort": 80,
+                                "protocol": "Tcp",
+                                "backendPoolName": "bep1",
+                                "frontendIPConfigurationName": "fe-config1",
+                                "enableFloatingIP": false,
+                                "probeName": "lbp1"
+                              }
+                            ],
+                            "probes": [
+                              {
+                                "name": "lbp1",
+                                "port": 80,
+                                "protocol": "Http",
+                                "requestPath": "/"
+                              }
+                            ],
+                            "backendPools": [
+                              {
+                                "name": "bep1",
+                                "nicIndex": 0
+                              }
+                            ],
+                            "inboundNatRules": [
+                              {
+                                "name": "ssh",
+                                "frontendIPConfigurationName": "fe-config1",
+                                "startingFrontendPort": 50000,
+                                "backendPort": 22,
+                                "natRuleType": "All",
+                                "protocol": "Tcp",
+                                "nicIndex": 0
+                              }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "type": "VirtualMachine",
+                    "settings":{
+                        "namePrefix": "ra-dmz-data",
+                        "computerNamePrefix": "data",
+                        "size": "Standard_DS1_v2",
+                        "osType": "linux",
+                        "adminUsername": "testuser",
+                        "adminPassword": "AweS0me@PW",
+                        "virtualNetwork": {
+                            "name": "ra-vnet"
+                        },
+                        "nics": [
+                          {
+                            "isPublic": false,
+                            "subnetName": "data",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "isPrimary": true,
+                            "enableIPForwarding": false,
+                            "backendPoolNames": [
+                              "bep1"
+                            ]
+                          }
+                        ],
+                        "imageReference": {
+                          "publisher": "Canonical",
+                          "offer": "UbuntuServer",
+                          "sku": "14.04.5-LTS",
+                          "version": "latest"
+                        },
+                        "dataDisks": {
+                          "count": 1
+                        },
+                        "extensions": [
+                          {
+                            "name": "apache-config-ext",
+                            "publisher": "Microsoft.Azure.Extensions",
+                            "type": "CustomScript",
+                            "typeHandlerVersion": "2.0",
+                            "autoUpgradeMinorVersion": true,
+                            "settings": {
+                              "fileUris": [ "https://raw.githubusercontent.com/mspnp/reference-architectures/master/dmz/secure-vnet-hybrid/extensions/linux/install-apache.sh" ]
+                            },
+                            "protectedSettings": { 
+                              "commandToExecute": "sudo sh install-apache.sh"
+                            }
+                          }
+                        ],
+                        "loadBalancerSettings": {
+                            "frontendIPConfigurations": [
+                                {
+                                  "name": "fe-config1",
+                                  "loadBalancerType": "Internal",
+                                  "domainNameLabel": "",
+                                  "internalLoadBalancerSettings": {
+                                    "privateIPAddress": "10.0.3.100",
+                                    "subnetName": "data"
+                                  }
+                                }
+                              ],
+                              "loadBalancingRules": [
+                                {
+                                  "name": "lbr1",
+                                  "frontendPort": 80,
+                                  "backendPort": 80,
+                                  "protocol": "Tcp",
+                                  "backendPoolName": "bep1",
+                                  "frontendIPConfigurationName": "fe-config1",
+                                  "enableFloatingIP": false,
+                                  "probeName": "lbp1"
+                                }
+                              ],
+                              "probes": [
+                                {
+                                  "name": "lbp1",
+                                  "port": 80,
+                                  "protocol": "Http",
+                                  "requestPath": "/"
+                                }
+                              ],
+                              "backendPools": [
+                                {
+                                  "name": "bep1",
+                                  "nicIndex": 0
+                                }
+                              ],
+                              "inboundNatRules": [
+                                {
+                                  "name": "ssh",
+                                  "frontendIPConfigurationName": "fe-config1",
+                                  "startingFrontendPort": 50000,
+                                  "backendPort": 22,
+                                  "natRuleType": "All",
+                                  "protocol": "Tcp",
+                                  "nicIndex": 0
+                                }
+                              ]                            
+                        }
+                    }
+                },
+                {
+                  "type": "VirtualNetworkGateway",
+                  "settings":[
+                    {
+                      "isPublic": true,
+                      "name": "ra-vpn-vgw",
+                      "gatewayType": "Vpn",
+                      "vpnType": "RouteBased",
+                      "sku": "Basic",
+                      "virtualNetwork": {
+                        "name": "ra-vnet"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "Connection",
+                  "settings":[
+                    {
+                      "name": "ra-vpn-cn",
+                      "connectionType": "IPsec",
+                      "sharedKey": "123secret",
+                      "virtualNetworkGateway": {
+                        "name": "ra-vpn-vgw"
+                      },
+                      "localNetworkGateway": {
+                        "name": "ra-vpn-lgw",
+                        "ipAddress": "40.50.60.70",
+                        "addressPrefixes": [ "192.168.0.0/16" ]
+                      },
+                      "routingWeight": 100
+                    }
+                  ]
+                },
+                {
+                  "type": "NetworkSecurityGroup",
+                  "settings": [
+                    {
+                      "name": "mgmt-nsg",
+                      "subnets": [ "mgmt" ],
+                      "securityRules": [
+                        {
+                          "name": "on-prem-rdp-allow",
+                          "direction": "Inbound",
+                          "priority": 100,
+                          "sourceAddressPrefix": "192.168.0.0/16",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 3389,
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "on-prem-ssh-allow",
+                          "direction": "Inbound",
+                          "priority": 200,
+                          "sourceAddressPrefix": "192.168.0.0/16",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 22,
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "gateway-allow",
+                          "direction": "Inbound",
+                          "priority": 300,
+                          "sourceAddressPrefix": "10.0.255.224/27",
+                          "destinationAddressPrefix": "*",
+                          "sourcePortRange": "*",
+                          "destinationPortRange": "*",
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "self-allow",
+                          "direction": "Inbound",
+                          "priority": 400,
+                          "sourceAddressPrefix": "10.0.0.128/25",
+                          "destinationAddressPrefix": "*",
+                          "sourcePortRange": "*",
+                          "destinationPortRange": "*",
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "vnet-deny",
+                          "direction": "Inbound",
+                          "priority": 500,
+                          "sourceAddressPrefix": "*",
+                          "destinationAddressPrefix": "*",
+                          "sourcePortRange": "*",
+                          "destinationPortRange": "*",
+                          "access": "Deny",
+                          "protocol": "*"
+                        }
+                      ]
+                    },
+                    {
+                      "name": "web-nsg",
+                      "subnets": [ "web" ],
+                      "securityRules": [
+                        {
+                          "name": "on-prem-allow",
+                          "direction": "Inbound",
+                          "priority": 100,
+                          "sourceAddressPrefix": "192.168.0.0/16",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 80,
+                          "access": "Allow",
+                          "protocol": "TCP"
+                        },
+                        {
+                          "name": "vnet-allow",
+                          "direction": "Inbound",
+                          "priority": 200,
+                          "sourceAddressPrefix": "10.0.0.0/16",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 80,
+                          "access": "Allow",
+                          "protocol": "TCP"
+                        },
+                        {
+                          "name": "mgmt-rdp-allow",
+                          "direction": "Inbound",
+                          "priority": 300,
+                          "sourceAddressPrefix": "10.0.0.128/25",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 3389,
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "mgmt-ssh-allow",
+                          "direction": "Inbound",
+                          "priority": 400,
+                          "sourceAddressPrefix": "10.0.0.128/25",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 22,
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "vnet-deny",
+                          "direction": "Inbound",
+                          "priority": 500,
+                          "sourceAddressPrefix": "*",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": "*",
+                          "access": "Deny",
+                          "protocol": "*"
+                        }
+                      ]
+                    },
+                    {
+                      "name": "biz-nsg",
+                      "subnets": [ "biz" ],
+                      "securityRules": [
+                        {
+                          "name": "web-allow",
+                          "direction": "Inbound",
+                          "priority": 100,
+                          "sourceAddressPrefix": "10.0.1.0/24",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": "*",
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "mgmt-rdp-allow",
+                          "direction": "Inbound",
+                          "priority": 200,
+                          "sourceAddressPrefix": "10.0.0.128/25",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 3389,
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "mgmt-ssh-allow",
+                          "direction": "Inbound",
+                          "priority": 300,
+                          "sourceAddressPrefix": "10.0.0.128/25",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 22,
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "vnet-deny",
+                          "direction": "Inbound",
+                          "priority": 400,
+                          "sourceAddressPrefix": "*",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": "*",
+                          "access": "Deny",
+                          "protocol": "*"
+                        }
+                      ]
+                    },
+                    {
+                      "name": "data-nsg",
+                      "subnets": [ "data" ],
+                      "securityRules": [
+                        {
+                          "name": "biz-allow",
+                          "direction": "Inbound",
+                          "priority": 100,
+                          "sourceAddressPrefix": "10.0.2.0/24",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": "*",
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "mgmt-rdp-allow",
+                          "direction": "Inbound",
+                          "priority": 200,
+                          "sourceAddressPrefix": "10.0.0.128/25",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 3389,
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "mgmt-ssh-allow",
+                          "direction": "Inbound",
+                          "priority": 300,
+                          "sourceAddressPrefix": "10.0.0.128/25",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": 22,
+                          "access": "Allow",
+                          "protocol": "*"
+                        },
+                        {
+                          "name": "vnet-deny",
+                          "direction": "Inbound",
+                          "priority": 400,
+                          "sourceAddressPrefix": "*",
+                          "sourcePortRange": "*",
+                          "destinationAddressPrefix": "*",
+                          "destinationPortRange": "*",
+                          "access": "Deny",
+                          "protocol": "*"
+                        }
+                      ]
+                    }            
+                  ]
+                },
+                {
+                  "type": "VirtualMachine",
+                  "settings": {
+                      "vmCount": 2,
+                      "namePrefix": "int-dmz",
+                      "computerNamePrefix": "int-dmz",
+                      "size": "Standard_DS2_v2",
+                      "osType": "linux",
+                      "adminUsername": "testuser",
+                      "adminPassword": "AweS0me@PW",
+                      "virtualNetwork": {
+                          "name": "ra-vnet"
+                      },                        
+                      "nics": [
+                        {
+                          "isPublic": false,
+                          "subnetName": "dmz-in",
+                          "privateIPAllocationMethod": "Dynamic",
+                          "isPrimary": true,
+                          "enableIPForwarding": true,
+                          "backendPoolNames": [
+                              "nva-lb-Bep"
+                          ]
+                        },
+                        {
+                          "isPublic": false,
+                          "subnetName": "dmz-out",
+                          "privateIPAllocationMethod": "Dynamic",
+                          "isPrimary": false,
+                          "enableIPForwarding": true
+                        }
+                      ],
+                      "imageReference": {
+                          "publisher": "Canonical",
+                          "offer": "UbuntuServer",
+                          "sku": "14.04.5-LTS",
+                          "version": "latest"
+                      },
+                      "extensions": [
+                          {
+                            "name": "enable-iptables-routes",
+                            "publisher": "Microsoft.Azure.Extensions",
+                            "type": "CustomScript",
+                            "typeHandlerVersion": "2.0",
+                            "autoUpgradeMinorVersion": true,
+                            "settings": {
+                              "fileUris": [
+                                "https://raw.githubusercontent.com/mspnp/template-building-blocks/v1.0.0/templates/resources/Microsoft.Compute/virtualMachines/extensions/linux/enable-iptables-routes/enable-iptables-routes.sh"
+                              ],
+                              "commandToExecute": "bash enable-iptables-routes.sh internal 10.0.1.100"
+                            },
+                            "protectedSettings": { }
+                          }
+                      ],
+                      "loadBalancerSettings": {
+                          "frontendIPConfigurations": [
+                              {
+                                "name": "nva-lb-fe",
+                                "loadBalancerType": "Internal",
+                                "internalLoadBalancerSettings": {
+                                  "privateIPAddress": "10.0.0.20",
+                                  "subnetName": "dmz-in"                                                
+                                }
+                              }
+                            ],
+                            "loadBalancingRules": [
+                              {
+                                "name": "nva-rule0",
+                                "frontendPort": 80,
+                                "backendPort": 80,
+                                "protocol": "Tcp",
+                                "backendPoolName": "nva-lb-Bep",
+                                "frontendIPConfigurationName": "nva-lb-fe",
+                                "enableFloatingIP": false,
+                                "probeName": "hp1",
+                                "idleTimeoutInMinutes": 4
+                              }
+                            ],
+                            "probes": [
+                              {
+                                  "name": "hp1",
+                                  "port": 80,
+                                  "protocol": "Http",
+                                  "requestPath": "/"
+                              }
+                            ],
+                            "backendPools": [
+                              {
+                                "name": "nva-lb-Bep",
+                                "nicIndex": 0
+                              }
+                            ]
+                      }
+                  }
+              },
+              {
+                  "type": "RouteTable",
+                  "settings": {
+                      "name": "intranet-dmz-rt1",
+                      "virtualNetworks": [
+                          {
+                              "name": "ra-vnet",
+                              "subnets": [
+                                  "GatewaySubnet"
+                              ]
+                          }
+                      ],
+                      "routes": [
+                          {
+                              "name": "nva-route0",
+                              "addressPrefix": "10.0.1.0/24",
+                              "nextHop": "10.0.0.20"
+                          },
+                          {
+                              "name": "nva-route1",
+                              "addressPrefix": "10.0.2.0/24",
+                              "nextHop": "10.0.0.20"
+                          },
+                          {
+                              "name": "nva-route2",
+                              "addressPrefix": "10.0.3.0/24",
+                              "nextHop": "10.0.0.20"
+                          }
+                      ]
+                  }
+              }
+            ]
+        }
+    }
+}

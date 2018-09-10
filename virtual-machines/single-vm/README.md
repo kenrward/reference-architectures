@@ -182,13 +182,19 @@ The extension building block for a Windows VM is similar tot he Linux one, excep
 						"name": "iis-config-ext",
 						"publisher": "Microsoft.Powershell",
 						"type": "DSC",
-						"typeHandlerVersion": "2.1",
+						"typeHandlerVersion": "2.7",
 						"autoUpgradeMinorVersion": true,
 						"settings": {
-							"ModulesUrl": "https://raw.githubusercontent.com/mspnp/reference-architectures/mster/scripts/windows/iisaspnet.ps1.zip",
-							"configurationFunction": "iisaspnet.ps1\\iisaspnet"
+							"configuration":
+							{
+								"url": "https://raw.githubusercontent.com/mspnp/reference-architectures/master/scripts/windows/iisaspnet.ps1.zip",
+								"script": "iisaspnet.ps1",
+								"function": "iisaspnet"
+							}
 						},
-						"protectedSettings": {}
+						"protectedSettings": {
+							"configurationArguments": { }
+						}
 					}                
 				]
 			}
